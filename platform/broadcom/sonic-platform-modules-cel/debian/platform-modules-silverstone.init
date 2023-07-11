@@ -15,12 +15,22 @@
 case "$1" in
 start)
         echo -n "Setting up board... "
-
-        modprobe i2c-dev
+	
+	modprobe i2c-dev
+	modprobe ipmi_devintf
         modprobe baseboard-lpc
-        modprobe switchboard
-        modprobe mc24lc64t
-        modprobe ipmi_devintf
+	modprobe cls-i2c-mux-pca954x
+	modprobe cls-switchboard
+	modprobe xcvr-cls
+	modprobe switch_cpld
+
+	sleep 1
+
+	for i in {0..3}
+	do
+		echo -2 > /sys/devices/pci0000:00/0000:00:1c.0/0000:09:00.0/ocores-i2c.3/i2c-3/3-007$i/idle_state
+	done
+
 
         # Instantiate TLV EEPROM device on I801 bus 
         devname=`cat /sys/bus/i2c/devices/i2c-0/name`
