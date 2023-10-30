@@ -1,5 +1,4 @@
 depmod -a
-systemctl enable platform-modules-silverstone.service
-systemctl start platform-modules-silverstone.service
+systemctl enable pddf-platform-init.service
+systemctl start pddf-platform-init.service
 
-/usr/local/bin/platform_api_mgnt.sh install
