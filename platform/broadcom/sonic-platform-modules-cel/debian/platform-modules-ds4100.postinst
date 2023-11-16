@@ -1,0 +1,8 @@
+depmod -a
+#systemctl enable platform-modules-ds4100.service
+#systemctl start platform-modules-ds4100.service
+
+#/usr/local/bin/platform_api_mgnt.sh install
+
+systemctl enable pddf-platform-init.service
+systemctl start pddf-platform-init.service
