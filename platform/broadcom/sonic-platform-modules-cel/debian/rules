@@ -19,7 +19,7 @@ override_dh_auto_build:
 			python3 setup.py bdist_wheel -d $(MOD_SRC_DIR)/$${mod}/modules; \
 			continue; \
 		fi; \
-                if [ $$mod = "silverstone" || $$mod = "belgite" ]; then \
+                if [ $$mod = "silverstone" ] || [ $$mod = "belgite" ]; then \
                        cd $(MOD_SRC_DIR); \
                        if [ -d $(MOD_SRC_DIR)/$${mod}/pddf ]; then \
                                cd $(MOD_SRC_DIR)/$${mod}/pddf; \
