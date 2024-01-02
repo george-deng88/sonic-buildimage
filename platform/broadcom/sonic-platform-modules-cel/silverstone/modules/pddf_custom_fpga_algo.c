@@ -1,5 +1,4 @@
 /*
-* Copyright (C) 2021 Broadcom Inc
 *
 * Licensed under the GNU General Public License Version 2
 *
@@ -15,11 +14,14 @@
 *
 */
 
-/**
-* @file pddf_custom_fpga_algo.c
-* @brief i2c driver algorithms for Silverstone 7021 FPGA adapters
+/*
+* pddf_custom_fpga_algo.c
+* Description:
+*   A sample i2c driver algorithms for Silverstone 7021 FPGA adapters
 *
 *********************************************************************************/
+#define __STDC_WANT_LIB_EXT1__ 1
+#include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -27,7 +29,9 @@
 #include <linux/jiffies.h>
 #include <linux/errno.h>
 #include <linux/i2c.h>
-#include "../../../../pddf/i2c/modules/include/pddf_i2c_algo.h" 
+#include "../../../../pddf/i2c/modules/include/pddf_i2c_algo.h"
+
+#define DEBUG 0
 
 enum {
     STATE_DONE = 0,
@@ -67,8 +71,6 @@ enum {
 #define FPGAI2C_REG_STAT_BUSY       0x40
 #define FPGAI2C_REG_STAT_NACK       0x80
 
-#define MOD_VERSION "0.0.1"
-
 struct fpgalogic_i2c {
     void __iomem *base;
     u32 reg_shift;
@@ -86,10 +88,11 @@ struct fpgalogic_i2c {
     struct mutex lock;
 };
 
-extern int (*pddf_i2c_pci_add_numbered_bus)(struct i2c_adapter *, int);
-static int (*pddf_i2c_pci_add_numbered_bus_original)(struct i2c_adapter *, int);
-
 static struct fpgalogic_i2c fpgalogic_i2c[I2C_PCI_MAX_BUS];
+extern void __iomem * fpga_ctl_addr;
+extern int (*ptr_fpgapci_read)(uint32_t);
+extern int (*ptr_fpgapci_write)(uint32_t, uint32_t);
+extern int (*pddf_i2c_pci_add_numbered_bus)(struct i2c_adapter *, int);
 
 void i2c_get_mutex(struct fpgalogic_i2c *i2c)
 {
@@ -329,24 +332,27 @@ static int adap_data_init(struct i2c_adapter *adap, int i2c_ch_index)
 #if DEBUG
     pddf_dbg(FPGA, KERN_INFO "[%s] index: [%d] fpga_data__base_addr:0x%0x8lx"
         " fpgapci_bar_len:0x%08lx fpga_i2c_ch_base_addr:0x%08lx ch_size=0x%x supported_i2c_ch=%d",
-             __FUNCTION__, i2c_ch_index, pci_privdata->fpga_data_base_addr, 
-            pci_privdata->bar_length, pci_privdata->fpga_i2c_ch_base_addr, 
+             __FUNCTION__, i2c_ch_index, pci_privdata->fpga_data_base_addr,
+            pci_privdata->bar_length, pci_privdata->fpga_i2c_ch_base_addr,
             pci_privdata->fpga_i2c_ch_size, pci_privdata->max_fpga_i2c_ch);
 #endif
     if (i2c_ch_index >= pci_privdata->max_fpga_i2c_ch || pci_privdata->max_fpga_i2c_ch > I2C_PCI_MAX_BUS) {
-        printk("[%s]: ERROR i2c_ch_index=%d max_ch_index=%d out of range: %d\n", 
+        printk("[%s]: ERROR i2c_ch_index=%d max_ch_index=%d out of range: %d\n",
              __FUNCTION__, i2c_ch_index, pci_privdata->max_fpga_i2c_ch, I2C_PCI_MAX_BUS);
         return -1;
     }
-
-    memset (&fpgalogic_i2c[i2c_ch_index], 0, sizeof(fpgalogic_i2c[0]));
+#ifdef __STDC_LIB_EXT1__
+    memset_s(&fpgalogic_i2c[i2c_ch_index], sizeof(fpgalogic_i2c[0]), 0, sizeof(fpgalogic_i2c[0]));
+#else
+    memset(&fpgalogic_i2c[i2c_ch_index], 0, sizeof(fpgalogic_i2c[0]));
+#endif
     /* Initialize driver's itnernal data structures */
     fpgalogic_i2c[i2c_ch_index].reg_shift = 2; /* 8 bit registers */
     fpgalogic_i2c[i2c_ch_index].reg_io_width = 1; /* 8 bit read/write */
-    fpgalogic_i2c[i2c_ch_index].timeout = 1000;//1000;//1ms
+    fpgalogic_i2c[i2c_ch_index].timeout = 500;//1000;//1ms
     fpgalogic_i2c[i2c_ch_index].ip_clock_khz = 62500;//100000;/* input clock of 100MHz */
     fpgalogic_i2c[i2c_ch_index].bus_clock_khz = 100;
-    fpgalogic_i2c[i2c_ch_index].base = pci_privdata->fpga_i2c_ch_base_addr + 
+    fpgalogic_i2c[i2c_ch_index].base = pci_privdata->fpga_i2c_ch_base_addr +
                           i2c_ch_index* pci_privdata->fpga_i2c_ch_size;
     mutex_init(&fpgalogic_i2c[i2c_ch_index].lock);
     fpgai2c_init(&fpgalogic_i2c[i2c_ch_index]);
@@ -361,31 +367,52 @@ static int pddf_i2c_pci_add_numbered_bus_silverstone (struct i2c_adapter *adap, 
 {
     int ret = 0;
 
-    adap_data_init(adap, i2c_ch_index); 
+    adap_data_init(adap, i2c_ch_index);
     adap->algo = &fpgai2c_algorithm;
 
     ret = i2c_add_numbered_adapter(adap);
     return ret;
 }
 
+/*
+ * FPGAPCI APIs
+ */
+int board_i2c_fpgapci_read(uint32_t offset)
+{
+	int data;
+	data=ioread32(fpga_ctl_addr+offset);
+	return data;
+}
+
+
+int board_i2c_fpgapci_write(uint32_t offset, uint32_t value)
+{
+	iowrite32(value, fpga_ctl_addr+offset);
+	return (0);
+}
+
+
 static int __init pddf_custom_fpga_algo_init(void)
 {
-    pddf_i2c_pci_add_numbered_bus_original = pddf_i2c_pci_add_numbered_bus;
-    pddf_i2c_pci_add_numbered_bus = &pddf_i2c_pci_add_numbered_bus_silverstone;
+    pddf_dbg(FPGA, KERN_INFO "[%s]\n", __FUNCTION__);
+    pddf_i2c_pci_add_numbered_bus = pddf_i2c_pci_add_numbered_bus_silverstone;
+    ptr_fpgapci_read = board_i2c_fpgapci_read;
+    ptr_fpgapci_write = board_i2c_fpgapci_write;
     return 0;
 }
+
 static void __exit pddf_custom_fpga_algo_exit(void)
 {
-    pddf_i2c_pci_add_numbered_bus = pddf_i2c_pci_add_numbered_bus_original;
+    pddf_dbg(FPGA, KERN_INFO "[%s]\n", __FUNCTION__);
+
+    pddf_i2c_pci_add_numbered_bus = NULL;
+    ptr_fpgapci_read = NULL;
+    ptr_fpgapci_write = NULL;
     return;
 }
 
-module_init(pddf_custom_fpga_algo_init);
-module_exit(pddf_custom_fpga_algo_exit);
 
-MODULE_AUTHOR("George Deng <dgeorge@celestica.com>");
-MODULE_DESCRIPTION("Celestica Silverstone pddf fpga driver");
-MODULE_VERSION(MOD_VERSION);
+module_init (pddf_custom_fpga_algo_init);
+module_exit (pddf_custom_fpga_algo_exit);
+MODULE_DESCRIPTION("Celestica Silverstone 7021 FPGAPCIe I2C-Bus algorithm");
 MODULE_LICENSE("GPL");
-
-
