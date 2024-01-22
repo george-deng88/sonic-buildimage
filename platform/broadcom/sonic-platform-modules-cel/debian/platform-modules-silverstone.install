@@ -1,4 +1,5 @@
-silverstone/modules/sonic_platform-1.0-py3-none-any.whl usr/share/sonic/device/x86_64-cel_silverstone-r0/pddf
+silverstone/systemd/pddf-platform-init.service etc/systemd/system
+silverstone/pddf/sonic_platform-1.0-py3-none-any.whl usr/share/sonic/device/x86_64-cel_silverstone-r0/pddf
 silverstone/scripts/pddf_pre_driver_install.sh usr/local/bin
 silverstone/scripts/pddf_post_device_create.sh usr/local/bin
 

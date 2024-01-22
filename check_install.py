@@ -10,7 +10,8 @@ def main():
 
     parser = argparse.ArgumentParser(description='test_login cmdline parser')
     parser.add_argument('-u', default="admin", help='login user name')
-    parser.add_argument('-P', default="YourPaSsWoRd", help='login password')
+    #parser.add_argument('-P', default="YourPaSsWoRd", help='login password')
+    parser.add_argument('-P', default="password", help='login password')
     parser.add_argument('-N', default="Test@2022", help='new password')
     parser.add_argument('-p', type=int, default=9000, help='local port')
 
